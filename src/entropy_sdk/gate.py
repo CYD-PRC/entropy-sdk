@@ -47,7 +47,19 @@ class UtilityGate:
         self.theta = float(theta)
 
     def evaluate(self, state: Any, action: Any) -> GateDecision:
-        u = float(self._utility(state, action))
+        # FIX-2：效用函数异常视同 U=−∞ 拒绝（fail-closed），不穿透 step()；
+        # meta 载明错误类型，由 runtime 落 gate_error 审计（与 execute 异常分属）。
+        try:
+            u = float(self._utility(state, action))
+        except Exception as exc:
+            err = f"{type(exc).__name__}: {exc}"
+            return GateDecision(
+                admitted=False,
+                utility=float("-inf"),
+                theta=self.theta,
+                reason=f"gate_error: utility raised {err} (treated as U=-inf)",
+                meta={"gate_error": err},
+            )
         admitted = u >= self.theta
         return GateDecision(
             admitted=admitted,

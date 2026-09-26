@@ -20,8 +20,11 @@ def gated_tool(runtime: EntropyRuntime, tool: Any, required_gear: int | Gear = G
     def _run(*args: Any, **kwargs: Any) -> str:
         from .raw import action  # 延迟导入，避免硬依赖
 
+        # FIX-7：description 透传，效用函数可按工具身份定价
         act = action(tool.func if hasattr(tool, "func") else tool,
-                     *args, required_gear=required_gear, **kwargs)
+                     *args, required_gear=required_gear,
+                     description=getattr(tool, "description", "") or getattr(tool, "name", ""),
+                     **kwargs)
         result = runtime.step(state=state_fn(), action=act, execute=lambda a: a())
         if result.executed:
             return str(result.result)
@@ -37,4 +40,6 @@ def gated_tool(runtime: EntropyRuntime, tool: Any, required_gear: int | Gear = G
         name=f"gated_{getattr(tool, 'name', 'tool')}",
         description=(getattr(tool, "description", "") or "")
         + f" [safety-gated, requires gear {Gear(int(required_gear)).label}]",
+        # FIX-6：透传原工具的 args_schema——不带它，带参工具没有正常调用路径
+        args_schema=getattr(tool, "args_schema", None),
     )

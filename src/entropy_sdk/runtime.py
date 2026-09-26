@@ -16,6 +16,18 @@ from .policy import GearPolicy
 from .state import AuditLog, RuntimeState
 
 
+def _safe_gear(value: Any) -> Gear | None:
+    """把调用方声明的 required_gear 收敛成合法 Gear；非法值返回 None（FIX-4）。
+
+    required_gear 是调用方声明契约（attestation）——标签不可信时
+    fail-closed：视同「不允许」，走档位前置闸拒绝路径，不抛栈穿透。
+    """
+    try:
+        return Gear(int(value))
+    except (TypeError, ValueError):
+        return None
+
+
 @dataclass
 class CycleResult:
     """单周期结果。"""
@@ -112,6 +124,13 @@ class EntropyRuntime:
 
         # m 次连续拒绝 → G0 挂起（Theorem 4 的终点）
         if self.state.consecutive_rejections >= self.fallback_cfg.max_consecutive_rejections:
+            # FIX-5a：挂起导致的硬降档也要在链上留 gear_transition（换挡不许静默）
+            if self.state.gear != Gear.OBSERVE:
+                self.audit.record(
+                    "gear_transition", cycle=self.state.cycle,
+                    **{"from": int(self.state.gear), "to": int(Gear.OBSERVE)},
+                    sigma=round(self.state.sigma, 4), reason="suspend",
+                )
             self.state.gear = Gear.OBSERVE
             self.state.suspended = True
             result.suspended = True
@@ -139,7 +158,19 @@ class EntropyRuntime:
         execute: Callable[[Any], Any],
         propose_alternative: AlternativeProposer | None,
     ) -> CycleResult:
-        required = Gear(int(getattr(action, "required_gear", Gear.EXECUTE)))
+        required = _safe_gear(getattr(action, "required_gear", Gear.EXECUTE))
+
+        # FIX-4：非法 required_gear 视同档位不允许（fail-closed），不抛栈穿透
+        if required is None:
+            self.audit.record(
+                "gate_decision", cycle=self.state.cycle, admitted=False,
+                reason=f"invalid required_gear "
+                       f"{getattr(action, 'required_gear', None)!r} (attestation rejected)",
+            )
+            alt = self._try_alternatives(state, action, execute, propose_alternative)
+            if alt is not None:
+                return alt
+            return CycleResult(False, action, None, self.state.gear, self.state.gear)
 
         # 档位前置闸：超出当前动作空间的动作连门都不进
         if not self.state.gear.permits(required):
@@ -157,6 +188,10 @@ class EntropyRuntime:
             "gate_decision", cycle=self.state.cycle, admitted=decision.admitted,
             utility=round(decision.utility, 4), theta=decision.theta, reason=decision.reason,
         )
+        # FIX-2：效用异常视同 U=−∞ 拒绝（fail-closed），审计事件与 execute 异常分属
+        if decision.meta.get("gate_error"):
+            self.audit.record("gate_error", cycle=self.state.cycle,
+                              error=decision.meta["gate_error"])
         if decision.admitted:
             return self._run(action, execute, decision, used_fallback=False)
 
@@ -175,10 +210,26 @@ class EntropyRuntime:
         if propose_alternative is None:
             return None
         for i in range(self.fallback_cfg.max_alternatives):
-            alt = propose_alternative(state, rejected, i)
+            # FIX-1：proposer 异常视同无备选——记审计后走正常拒绝分支，
+            # 不穿透 step()（对齐 Theorem 4：拒绝路径的 σ/挂起语义照常生效）
+            try:
+                alt = propose_alternative(state, rejected, i)
+            except Exception as exc:
+                self.audit.record(
+                    "proposer_error", cycle=self.state.cycle, attempt_index=i,
+                    error=type(exc).__name__,
+                )
+                break
             if alt is None:
                 break
-            required = Gear(int(getattr(alt, "required_gear", Gear.EXECUTE)))
+            required = _safe_gear(getattr(alt, "required_gear", Gear.EXECUTE))
+            if required is None:  # FIX-4：非法 gear 视同不允许
+                self.audit.record(
+                    "gate_decision", cycle=self.state.cycle, admitted=False,
+                    reason=f"fallback#{i}: invalid required_gear "
+                           f"{getattr(alt, 'required_gear', None)!r} (attestation rejected)",
+                )
+                continue
             if not self.state.gear.permits(required):
                 continue
             decision = self.gate.evaluate(state, alt)
@@ -187,6 +238,9 @@ class EntropyRuntime:
                 utility=round(decision.utility, 4), theta=decision.theta,
                 reason=f"fallback#{i}: {decision.reason}",
             )
+            if decision.meta.get("gate_error"):
+                self.audit.record("gate_error", cycle=self.state.cycle,
+                                  error=decision.meta["gate_error"])
             if decision.admitted:
                 return self._run(alt, execute, decision, used_fallback=True)
         return None

@@ -26,7 +26,10 @@ def gated(runtime: EntropyRuntime, required_gear: int | Gear = Gear.EXECUTE,
         def wrapper(*args: Any, **kwargs: Any) -> Any:
             from .raw import action
 
-            act = action(fn, *args, required_gear=required_gear, **kwargs)
+            # FIX-7：description 透传（docstring 优先，函数名兜底），效用可按工具身份定价
+            act = action(fn, *args, required_gear=required_gear,
+                         description=(fn.__doc__ or "").strip() or fn.__name__,
+                         **kwargs)
             result = runtime.step(state=state_fn(), action=act, execute=lambda a: a())
             if result.executed:
                 return result.result

@@ -26,7 +26,8 @@
 ## 快速开始
 
 ```bash
-pip install entropy-sdk
+# 尚未发布 PyPI —— 请源码安装（v0.1.1 起）
+pip install -e .
 ```
 
 ```python
@@ -36,6 +37,8 @@ from entropy_sdk import EntropyRuntime, Gear, action, observe
 def my_utility(state, act):
     return state.task_gain(act) + 2.0 * state.safety(act) - 0.5 * act.cost
 
+# 注意：action() 的 **kwargs 是被包装函数的调用参数，不是效用元数据；
+# 要给效用函数喂元数据，用创建后赋值（act.utility_value = ... 形态）。
 # 2. 创建运行时（θ 是唯一的安全-产能旋钮）
 runtime = EntropyRuntime(utility=my_utility, theta=0.15,
                          audit_log="audit.jsonl")
@@ -80,6 +83,26 @@ def delete_records(table: str) -> str: ...
 ```
 
 门拒绝时**返回说明字符串而非抛异常**——拒绝本身是反馈信号，agent 下一轮可自行调整。
+
+（PydanticAI extra 说明：该适配器是**纯 stdlib 装饰器**，实际零框架依赖——
+`pip install entropy-sdk[pydanticai]` 的 extra 列表为空（FIX-8 名实对齐），直接
+`from entropy_sdk.adapters.pydanticai import gated` 即可用。）
+
+## 威胁模型边界（论文护甲，部署前必读）
+
+1. **门是唯一调度通道——仅在 SDK 控制的执行路径内成立**。使用者拿到 callable
+   后可以直接调用绕过（`tool.func(...)` 不过门）；SDK 管的是「经过 runtime.step
+   的调用」，管不了使用者自己手里的引用。
+2. **`required_gear` 是调用方声明契约（attestation）**。SDK 信任标签的真实性；
+   标签是否可信（谁有权给动作标档位）是部署方的责任——SDK 只对非法值 fail-closed，
+   不对「低标高档动作」负责。
+3. **门管调用不管事务**。`execute` 内已经发生的副作用不回滚——门的语义是
+   invocation 控制，不是 atomicity。需要事务性请在你的 execute 里自己实现补偿。
+4. **`resume()` 不清 σ**（设计语义，非缺陷）：人工复核 ≠ 信任瞬时恢复——
+   挂起解除后 σ 保留，档位要在干净周期里重新挣下来。
+5. **并发**：runtime 无锁。当前 CPython（GIL）下实测 8000/8000 周期无丢失更新；
+   free-threaded Python（3.13t+）下 cycle/σ 的读-改-写存在丢失更新风险——
+   多线程使用请外部串行化。
 
 ## 实证数据接口
 

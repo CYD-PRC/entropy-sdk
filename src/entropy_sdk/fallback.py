@@ -21,6 +21,13 @@ class FallbackConfig:
     max_alternatives: int = 3      # k：每档最多尝试的备选数
     max_consecutive_rejections: int = 5  # m：连续拒绝上限，触发 G0 挂起
 
+    def __post_init__(self):
+        # FIX-3b：非法配置构造即抛（fail-closed）
+        if self.max_alternatives < 1:
+            raise ValueError("max_alternatives must be >= 1")
+        if self.max_consecutive_rejections < 1:
+            raise ValueError("max_consecutive_rejections must be >= 1")
+
 
 # 备选生成器签名：(state, rejected_action, attempt_index) -> alternative action | None
 AlternativeProposer = Callable[[Any, Any, int], Any | None]

@@ -22,6 +22,17 @@ class GearPolicy:
     sigma_decay: float = 0.1  # δ：动作被接受时 σ 的衰减
     sigma_step: float = 0.1   # Δσ：fallback 失败时 σ 的增量
 
+    def __post_init__(self):
+        # FIX-3a：配置零校验补上——非法参数构造即抛（fail-closed）
+        if self.patience < 1:
+            raise ValueError("patience must be >= 1")
+        if self.sigma_decay < 0:
+            raise ValueError("sigma_decay must be >= 0")
+        if self.sigma_step < 0:
+            raise ValueError("sigma_step must be >= 0")
+        if not self.sigma_low < self.sigma_high:
+            raise ValueError("sigma_low must be < sigma_high")
+
     def next_gear(self, state: RuntimeState) -> Gear:
         g = state.gear
         if state.sigma > self.sigma_high or state.error:

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "entropy-sdk"
-version = "0.1.0"
+version = "0.1.1"
 description = "Gear-based safety control layer for autonomous agents (EntropyRuntime core, embeddable SDK)"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -25,7 +25,7 @@ dependencies = []
 
 [project.optional-dependencies]
 langchain = ["langchain-core>=0.2"]
-pydanticai = ["pydantic-ai>=0.0.20"]
+pydanticai = []  # FIX-8：该适配器为纯 stdlib 装饰器，实际零框架依赖（名实对齐）
 dev = ["pytest>=8"]
 
 [project.urls]
