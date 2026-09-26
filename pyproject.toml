@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "entropy-sdk"
+version = "0.1.0"
+description = "Gear-based safety control layer for autonomous agents (EntropyRuntime core, embeddable SDK)"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [
+    { name = "Wang Miaosheng", email = "wmsmiaosheng@outlook.com" },
+]
+keywords = ["ai-safety", "agent", "governance", "runtime-verification", "gear"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+# 核心零依赖：纯 stdlib。框架适配器按需安装 extras。
+dependencies = []
+
+[project.optional-dependencies]
+langchain = ["langchain-core>=0.2"]
+pydanticai = ["pydantic-ai>=0.0.20"]
+dev = ["pytest>=8"]
+
+[project.urls]
+Homepage = "https://github.com/CYD-PRC/entropyruntime"
+Paper = "https://arxiv.org/abs/2607.00334"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
