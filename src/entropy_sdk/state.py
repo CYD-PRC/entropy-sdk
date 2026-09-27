@@ -35,6 +35,40 @@ class RuntimeState:
         return d
 
 
+# FIX5-1：嵌套容器内非有限 float 的递归消毒深度上限（防深递归炸栈）
+_SANITIZE_MAX_DEPTH = 32
+
+
+def _sanitize_nonfinite(value: Any, _depth: int = 0, _seen: set | None = None) -> Any:
+    """递归消毒嵌套 dict/list/tuple 里的非有限 float → 字符串标记
+    （"nan"/"+inf"/"-inf"，与顶层记号同族）。
+
+    防循环引用：沿当前递归路径的 id set（离开分支即摘除，故共享但不成环的
+    兄弟引用不误伤）；防深递归：深度超 _SANITIZE_MAX_DEPTH 截断为标记。
+    非容器、非浮点类型原样透传。
+    """
+    if isinstance(value, float):
+        if math.isfinite(value):
+            return value
+        return "nan" if math.isnan(value) else ("+inf" if value > 0 else "-inf")
+    if isinstance(value, (dict, list, tuple)):
+        if _seen is None:
+            _seen = set()
+        if _depth >= _SANITIZE_MAX_DEPTH or id(value) in _seen:
+            return "<truncated:depth-or-cycle>"
+        _seen.add(id(value))
+        try:
+            if isinstance(value, dict):
+                return {k: _sanitize_nonfinite(v, _depth + 1, _seen)
+                        for k, v in value.items()}
+            if isinstance(value, list):
+                return [_sanitize_nonfinite(v, _depth + 1, _seen) for v in value]
+            return tuple(_sanitize_nonfinite(v, _depth + 1, _seen) for v in value)
+        finally:
+            _seen.discard(id(value))
+    return value
+
+
 class AuditLog:
     """append-only JSONL 审计链。只追加，不修改，不落盘失败则抛错（fail-closed）。"""
 
@@ -51,7 +85,7 @@ class AuditLog:
     def record(self, kind: str, **fields: Any) -> dict:
         # FIX-5d：非有限浮点（NaN/Inf）消毒为 null + 同名字段加 _nonfinite 标记，
         # 保证 JSONL 对严格解析器合法（门对 NaN 效用的 fail-closed 行为不变）
-        clean = {}
+        clean: dict[str, Any] = {}
         for k, v in fields.items():
             if isinstance(v, float) and not math.isfinite(v):
                 clean[k] = None
@@ -60,7 +94,8 @@ class AuditLog:
                     "nan" if math.isnan(v) else ("+inf" if v > 0 else "-inf")
                 )
             else:
-                clean[k] = v
+                # FIX5-1：嵌套容器递归消毒（顶层既有行为与标记格式不动）
+                clean[k] = _sanitize_nonfinite(v)
         entry = {"ts": time.time(), "kind": kind, **clean}
         if self.path:
             self.path.parent.mkdir(parents=True, exist_ok=True)

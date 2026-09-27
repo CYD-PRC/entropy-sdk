@@ -11,7 +11,7 @@ SDK distillation of the EntropyRuntime paper's core abstractions
 ![python](https://img.shields.io/badge/python-%3E%3D3.10-blue)
 
 > Test readings are reported from **raw CI logs, not badge conclusions**:
-> latest verified reading — **82 passed / 0 skipped** across Python 3.10–3.13
+> latest verified reading — **96 passed / 0 skipped** across Python 3.10–3.13
 > (Actions run inspected line-by-line). A green badge alone is not evidence.
 
 Unlike [CYD-PRC/entropyruntime](https://github.com/CYD-PRC/entropyruntime)
@@ -102,7 +102,7 @@ A runnable version of this narrative lives in
 from entropy_sdk.adapters.langchain import gated_tool
 safe_tool = gated_tool(runtime, my_tool, required_gear=Gear.EXECUTE)
 
-# PydanticAI: pip install entropy-sdk[pydanticai]
+# PydanticAI-compatible callable decorator: pip install entropy-sdk[pydanticai]
 from entropy_sdk.adapters.pydanticai import gated
 
 @gated(runtime, required_gear=Gear.EXECUTE)
@@ -112,9 +112,11 @@ def delete_records(table: str) -> str: ...
 On rejection the adapters **return an explanatory string instead of raising** —
 rejection itself is feedback the agent can act on next turn.
 
-(PydanticAI extra note: that adapter is a **pure stdlib decorator** with zero
-framework dependencies — the `pydanticai` extra list is intentionally empty
-(FIX-8); just `from entropy_sdk.adapters.pydanticai import gated`.)
+(Note on naming: this is a **PydanticAI-compatible callable decorator**, not a
+true PydanticAI adapter — it is a pure stdlib decorator with zero framework
+dependencies (the `pydanticai` extra list is intentionally empty, FIX-8) and has
+**not been validated against a real PydanticAI runtime**. Just
+`from entropy_sdk.adapters.pydanticai import gated`.)
 
 (LangChain boundary: `args_schema` passthrough only works for real
 StructuredTool instances carrying a schema; bare tool objects (func only, no

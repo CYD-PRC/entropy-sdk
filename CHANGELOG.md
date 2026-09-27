@@ -1,5 +1,25 @@
 # Changelog
 
+## v0.1.5（2026-09-27 · KIMICODE-SDKFIX5-20260927，微修 + 发布工程）
+
+**FIX5-1 审计序列化递归消毒**：嵌套 dict/list/tuple 内的非有限 float（nan/±inf）
+递归替换为字符串标记（"nan"/"+inf"/"-inf"，与顶层记号同族）；防循环引用（递归路径
+id set，共享但不成环的兄弟引用不误伤）+ 深度上限 32（超限截断标记）。顶层既有行为
+与标记格式不动（v0.1.2 记号演进史保持）。
+
+**FIX5-2 LangChain adapter 齿轮契约统一**：构造期复用 runtime 的 `_safe_gear`——
+`3.0` / `"3"` / `True` 等非法形构造即拒，与 runtime 判定完全一致（消灭「adapter 静默
+截断、runtime 拒绝」的双口径）。
+
+**FIX5-3 README 措辞降级**：PydanticAI「适配器」实为纯 stdlib 装饰器——两份 README
+统一改为「PydanticAI-compatible callable decorator / PydanticAI 兼容的可调用装饰器」，
+并注明未经真实 PydanticAI runtime 集成验证。功能入口不动。
+
+**发布工程**（顺手项）：CI 增 packaging smoke（build → 装 wheel → import → pytest →
+twine check）/ mypy src/ 全量 / langchain-core 兼容双档（最低实测支持版 0.2.43 +
+声明域内最新）/ pip-audit（allow-fail）；langchain-core 声明区间收窄为
+`>=0.2.43,<1.0`（0.2.0 实测不兼容，地板钉实测值不钉声明）。
+
 ## v0.1.4（2026-09-27 · KIMICODE-SDKFIX4-20260927，发布准备）
 
 **fail-open 修复（FIX4-1，Grok 首发）**：效用门内新增非有限校验——utility 返回

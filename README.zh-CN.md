@@ -75,7 +75,7 @@ if result.suspended:
 from entropy_sdk.adapters.langchain import gated_tool
 safe_tool = gated_tool(runtime, my_tool, required_gear=Gear.EXECUTE)
 
-# PydanticAI：pip install entropy-sdk[pydanticai]
+# PydanticAI 兼容的可调用装饰器：pip install entropy-sdk[pydanticai]
 from entropy_sdk.adapters.pydanticai import gated
 
 @gated(runtime, required_gear=Gear.EXECUTE)
@@ -84,9 +84,10 @@ def delete_records(table: str) -> str: ...
 
 门拒绝时**返回说明字符串而非抛异常**——拒绝本身是反馈信号，agent 下一轮可自行调整。
 
-（PydanticAI extra 说明：该适配器是**纯 stdlib 装饰器**，实际零框架依赖——
-`pip install entropy-sdk[pydanticai]` 的 extra 列表为空（FIX-8 名实对齐），直接
-`from entropy_sdk.adapters.pydanticai import gated` 即可用。）
+（名实说明：这是**「PydanticAI 兼容的可调用装饰器」**而非真适配器——纯 stdlib
+装饰器、零框架依赖（`pydanticai` extra 列表刻意为空，FIX-8），且**未经真实
+PydanticAI runtime 集成验证**。直接 `from entropy_sdk.adapters.pydanticai import
+gated` 即可用。）
 
 （LangChain 边界句：`args_schema` 透传仅对带 schema 的真实 StructuredTool 生效；
 裸 tool 对象（只有 func、无 args_schema）仍受包装签名 `*args/**kwargs` 限制。）

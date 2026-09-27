@@ -20,3 +20,67 @@ jobs:
         run: pip install -e .[dev,langchain]
       - name: Test
         run: python -m pytest tests/ -v
+
+  # 发布工程（KIMICODE-SDKFIX5）：打包冒烟 / 类型检查 / langchain 兼容双档 / 依赖审计
+  packaging-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Build + install wheel + smoke
+        run: |
+          pip install build twine
+          python -m build
+          pip install dist/*.whl
+          python -c "import entropy_sdk; print(entropy_sdk.__version__)"
+      - name: Test installed wheel
+        run: python -m pytest tests/ -q
+      - name: twine check
+        run: twine check dist/*
+
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: mypy src/
+        run: |
+          pip install mypy
+          mypy src/ --ignore-missing-imports
+
+  langchain-compat:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        langchain-core: ["langchain-core==0.2.43", "langchain-core<1.0"]  # 最低实测支持版 + 声明域内最新
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install (pinned or latest langchain-core)
+        run: |
+          pip install -e .[dev]
+          pip install "${{ matrix.langchain-core }}"
+          python -c "import langchain_core; print('langchain-core', langchain_core.__version__)"
+      - name: Test
+        run: python -m pytest tests/ -q
+
+  pip-audit:
+    runs-on: ubuntu-latest
+    continue-on-error: true   # 依赖审计只报告不挡路（allow-fail）
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: pip-audit
+        run: |
+          pip install pip-audit
+          pip install -e .
+          pip-audit

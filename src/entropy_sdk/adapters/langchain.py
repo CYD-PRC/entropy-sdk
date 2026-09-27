@@ -7,7 +7,7 @@ from __future__ import annotations
 from typing import Any
 
 from ..gear import Gear
-from ..runtime import EntropyRuntime
+from ..runtime import EntropyRuntime, _safe_gear
 
 
 def gated_tool(runtime: EntropyRuntime, tool: Any, required_gear: int | Gear = Gear.EXECUTE,
@@ -17,12 +17,19 @@ def gated_tool(runtime: EntropyRuntime, tool: Any, required_gear: int | Gear = G
     门拒绝时返回拒绝说明字符串（不执行、不抛异常），
     让 LLM 在下一轮自行调整——拒绝本身是反馈信号。
     """
+    # FIX5-2：与 runtime 同一严格度——构造期即拒非法 gear（3.0/"3"/True 等），
+    # 消灭「adapter 静默截断、runtime 拒绝」的两处判定不一致
+    gear = _safe_gear(required_gear)
+    if gear is None:
+        raise ValueError(f"invalid required_gear {required_gear!r} "
+                         "(want Gear instance or plain int 0-4)")
+
     def _run(*args: Any, **kwargs: Any) -> str:
         from .raw import action  # 延迟导入，避免硬依赖
 
         # FIX-7：description 透传，效用函数可按工具身份定价
         act = action(tool.func if hasattr(tool, "func") else tool,
-                     *args, required_gear=required_gear,
+                     *args, required_gear=gear,
                      description=getattr(tool, "description", "") or getattr(tool, "name", ""),
                      **kwargs)
         result = runtime.step(state=state_fn(), action=act, execute=lambda a: a())
@@ -39,7 +46,7 @@ def gated_tool(runtime: EntropyRuntime, tool: Any, required_gear: int | Gear = G
         func=_run,
         name=f"gated_{getattr(tool, 'name', 'tool')}",
         description=(getattr(tool, "description", "") or "")
-        + f" [safety-gated, requires gear {Gear(int(required_gear)).label}]",
+        + f" [safety-gated, requires gear {gear.label}]",
         # FIX-6：透传原工具的 args_schema——不带它，带参工具没有正常调用路径
         args_schema=getattr(tool, "args_schema", None),
     )
