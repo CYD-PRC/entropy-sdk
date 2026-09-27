@@ -15,6 +15,8 @@ id set，共享但不成环的兄弟引用不误伤）+ 深度上限 32（超限
 统一改为「PydanticAI-compatible callable decorator / PydanticAI 兼容的可调用装饰器」，
 并注明未经真实 PydanticAI runtime 集成验证。功能入口不动。
 
+**PyPI**：v0.1.5 起发布至 PyPI（`pip install entropy-sdk`）；README 的「尚未发布」声明到期摘除（FIX4-4 的另一半寿命闭合）。
+
 **发布工程**（顺手项）：CI 增 packaging smoke（build → 装 wheel → import → pytest →
 twine check）/ mypy src/ 全量 / langchain-core 兼容双档（最低实测支持版 0.2.43 +
 声明域内最新）/ pip-audit（allow-fail）；langchain-core 声明区间收窄为

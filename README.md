@@ -45,8 +45,7 @@ repository is the **zero-dependency, embeddable** minimal control layer:
 ## Quickstart
 
 ```bash
-# Not yet on PyPI — install from source
-pip install -e .
+pip install entropy-sdk
 ```
 
 ```python

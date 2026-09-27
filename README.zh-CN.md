@@ -26,8 +26,7 @@
 ## 快速开始
 
 ```bash
-# 尚未发布 PyPI —— 请源码安装（v0.1.1 起）
-pip install -e .
+pip install entropy-sdk
 ```
 
 ```python
