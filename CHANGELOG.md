@@ -1,5 +1,19 @@
 # Changelog
 
+## v0.1.3（2026-09-27 · KIMICODE-SDKFIX3-20260927，终审尾款）
+
+**兼容性注记（fail-closed 方向）**：`required_gear=3.0`（整数值 float）自 v0.1.2
+（strict attestation）起由接受变拒绝——依赖该写法的集成方请改用 int（`3` 或
+`Gear.EXECUTE`）。
+
+**修复**：
+- 审计缓存隔离：对外 `.entries` 逐条浅拷贝，调用方涂改不再污染缓存与磁盘真值；
+- 换挡清零同律：降档路径也清 `clean_streak`（v0.1.2 只清升档——σ 降档路径会残留）；
+- CI 口径：`pip install -e .[dev,langchain]`，消灭「60 passed + 2 skipped 被报成 62」
+  的合并口径；
+- `initial_gear` 与 `required_gear` 同一严格度（非法构造即抛）；
+- 文档：审计文件被删时读路径 fail-open 的不对称声明（README 威胁模型第 7 条）。
+
 ## v0.1.2（2026-09-27 · KIMICODE-SDKFIX2-20260927）
 
 **BEHAVIOR CHANGE（FIX2-4）**：升档后 `clean_streak` 归零——每一档都需重新挣满 h 个

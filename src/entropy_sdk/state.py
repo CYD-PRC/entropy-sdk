@@ -74,7 +74,9 @@ class AuditLog:
     def entries(self) -> list[dict]:
         # FIX-5b：文件模式与 metrics 同语义——读盘返回（README 主推路径不再恒空）
         # FIX2-5：经缓存（mtime+size 失效），metrics 连读不重复扫盘
-        return self._read_all()
+        # FIX3-1：对外逐条浅拷贝——调用方涂改返回值不污染缓存与磁盘真值
+        #（条目值无嵌套结构，浅拷贝足够；内部 metrics 继续用缓存引用）
+        return [dict(e) for e in self._read_all()]
 
     def _read_all(self) -> list[dict]:
         if self.path and self.path.exists():

@@ -106,6 +106,9 @@ def delete_records(table: str) -> str: ...
 5. **`except Exception` 不覆盖 `BaseException`**：proposer/execute 回调里抛
    SystemExit/KeyboardInterrupt 时状态机仍会脱节——这是 Python 惯例取舍，
    调用方不应在回调里抛 BaseException。
+7. **审计文件被删时读路径静默返回空**（fail-open）：文件模式下 `entries`/
+   metrics 对不存在的链文件返回空集而非报错，与写路径的 fail-closed 不对称——
+   部署方应监控审计文件的存在性（append-only 链文件消失本身就是事件）。
 6. **并发**：runtime 无锁。当前 CPython（GIL）下实测 8000/8000 周期无丢失更新；
    free-threaded Python（3.13t+）下 cycle/σ 的读-改-写存在丢失更新风险——
    多线程使用请外部串行化。

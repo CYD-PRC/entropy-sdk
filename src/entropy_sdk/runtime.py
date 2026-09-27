@@ -81,7 +81,12 @@ class EntropyRuntime:
         self.policy = policy or GearPolicy()
         self.fallback_cfg = fallback or FallbackConfig()
         self.audit = audit_log if isinstance(audit_log, AuditLog) else AuditLog(audit_log)
-        self.state = RuntimeState(gear=Gear(initial_gear))
+        # FIX3-4：initial_gear 与 required_gear 同一严格度（strict attestation）
+        gear0 = _safe_gear(initial_gear)
+        if gear0 is None:
+            raise ValueError(f"invalid initial_gear {initial_gear!r} "
+                             "(want Gear instance or plain int 0-4)")
+        self.state = RuntimeState(gear=gear0)
         self.audit.record("init", gear=int(self.state.gear), theta=theta)
 
     # ------------------------------------------------------------------ #
@@ -129,10 +134,10 @@ class EntropyRuntime:
                 **{"from": int(self.state.gear), "to": int(gear_after)},
                 sigma=round(self.state.sigma, 4),
             )
-            # FIX2-4：升档清零 clean_streak——每一档都要重新挣满 h 个连续干净周期
-            #（v0.1.1 及以前：首档挣 h 之后每周期一档直窜，与「慢升、逐档挣得」语义不符；
-            #  降档/挂起路径无需处理：拒绝分支已先把 clean_streak 清零）
-            if gear_after > self.state.gear:
+            # FIX2-4 + FIX3-2：换挡即清零 clean_streak——每一档都要重新挣满 h 个
+            # 连续干净周期。升降档同律：FIX2-4 原判词「拒绝分支已先清零」不覆盖
+            # σ 降档路径（成功执行但 σ 超阈的降档会残留 streak，窄 σ 带下提前 1 周期升档）。
+            if gear_after != self.state.gear:
                 self.state.clean_streak = 0
             self.state.gear = gear_after
 
