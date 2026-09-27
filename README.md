@@ -1,127 +1,173 @@
 # entropy-sdk
 
-**可嵌入的 Agent 档位安全控制层** —— EntropyRuntime 论文（[arXiv:2607.00334](https://arxiv.org/abs/2607.00334)）核心抽象的 SDK 化提炼。
+**An embeddable, gear-based safety control layer for autonomous agents** — the
+SDK distillation of the EntropyRuntime paper's core abstractions
+([arXiv:2607.00334](https://arxiv.org/abs/2607.00334)).
 
-> 让 AI 的自主程度看得见、管得住、说得清。
+> Make an AI's degree of autonomy observable, governable, and accountable.
 
-与 [CYD-PRC/entropyruntime](https://github.com/CYD-PRC/entropyruntime)（生产级完整系统，FastAPI + PostgreSQL + Redis + OPA）不同，本仓库是**零依赖、可嵌入**的最小控制层：`pip install` 之后 5 行代码接进任何 agent 循环。
+[![test](https://github.com/CYD-PRC/entropy-sdk/actions/workflows/test.yml/badge.svg)](https://github.com/CYD-PRC/entropy-sdk/actions/workflows/test.yml)
+![license](https://img.shields.io/badge/license-MIT-blue)
+![python](https://img.shields.io/badge/python-%3E%3D3.10-blue)
 
-## 核心抽象
+> Test readings are reported from **raw CI logs, not badge conclusions**:
+> latest verified reading — **82 passed / 0 skipped** across Python 3.10–3.13
+> (Actions run inspected line-by-line). A green badge alone is not evidence.
 
-| 抽象 | 论文对应 | SDK |
+Unlike [CYD-PRC/entropyruntime](https://github.com/CYD-PRC/entropyruntime)
+(the full production system — FastAPI + PostgreSQL + Redis + OPA), this
+repository is the **zero-dependency, embeddable** minimal control layer:
+`pip install` and five lines of code wire it into any agent loop.
+
+## Core abstractions
+
+| Abstraction | Paper | SDK |
 |---|---|---|
-| 五级档位 G0–G4 | Definition 1（𝒜₀⊂…⊂𝒜₄） | `Gear` |
-| 效用门 U(s,a) ≥ θ | Definitions 2–3, Theorem 2 | `UtilityGate` |
-| 慢升快降状态机 | §4 Gear state machine | `GearPolicy` |
-| 事件驱动 fallback | Theorem 4 | `FallbackConfig` |
-| 运行时状态 ρ=(g,σ,ϵ) | Definition 4 | `RuntimeState` |
-| 审计链 | §5/§8 实证需求 | `AuditLog`（append-only JSONL） |
+| Five-level gear ladder G0–G4 | Definition 1 (𝒜₀⊂…⊂𝒜₄) | `Gear` |
+| Utility gate U(s,a) ≥ θ | Definitions 2–3, Theorem 2 | `UtilityGate` |
+| Slow-up-fast-down state machine | §4 Gear state machine | `GearPolicy` |
+| Event-driven fallback | Theorem 4 | `FallbackConfig` |
+| Runtime state ρ=(g,σ,ϵ) | Definition 4 | `RuntimeState` |
+| Audit chain | §5/§8 empirical requirements | `AuditLog` (append-only JSONL) |
 
-## 设计铁律
+## Design rules
 
-1. **核心纯 stdlib，零依赖**。框架适配（LangChain / PydanticAI）走 extras，按需安装。
-2. **fail-closed**。效用函数必须显式注入，没有 fail-open 开关——门是唯一调度通道（Theorem 2 在代码层的贯彻）。
-3. **审计链内置**。每次门判定、换挡、挂起自动落 JSONL；`gate_acceptance_rate()` 和 `gear_histogram()` 直接产出论文 Theorem 1 假设与 Theorem 3 预测所需的经验数据。
+1. **Pure stdlib core, zero dependencies.** Framework adapters (LangChain /
+   PydanticAI) ship as optional extras.
+2. **fail-closed.** The utility function must be injected explicitly; there is
+   no fail-open switch — the utility gate is the sole dispatch channel
+   (Theorem 2, enforced in code).
+3. **Audit chain built in.** Every gate decision, gear transition, and
+   suspension is appended to JSONL. `gate_acceptance_rate()` and
+   `gear_histogram()` produce the empirical data that the paper's Theorem 1
+   assumption and Theorem 3 prediction call for.
 
-## 快速开始
+## Quickstart
 
 ```bash
-# 尚未发布 PyPI —— 请源码安装（v0.1.1 起）
+# Not yet on PyPI — install from source
 pip install -e .
 ```
 
 ```python
 from entropy_sdk import EntropyRuntime, Gear, action, observe
 
-# 1. 注入你的领域效用函数（SDK 不内置 U）
+# 1. Inject your domain utility function (the SDK ships no built-in U)
 def my_utility(state, act):
     return state.task_gain(act) + 2.0 * state.safety(act) - 0.5 * act.cost
 
-# 注意：action() 的 **kwargs 是被包装函数的调用参数，不是效用元数据；
-# 要给效用函数喂元数据，用创建后赋值（act.utility_value = ... 形态）。
-# 2. 创建运行时（θ 是唯一的安全-产能旋钮）
+# Note: action()'s **kwargs are call parameters of the wrapped function,
+# not utility metadata. Feed metadata to the utility via post-creation
+# assignment (act.utility_value = ... style).
+# 2. Create the runtime (theta is the only safety-vs-output knob)
 runtime = EntropyRuntime(utility=my_utility, theta=0.15,
                          audit_log="audit.jsonl")
 
-# 3. 每个 agent 动作都过门
+# 3. Every agent action goes through the gate
 result = runtime.step(
     state=my_state,
     action=action(delete_records, "users", required_gear=Gear.EXECUTE),
     execute=lambda a: a(),
-    propose_alternative=my_fallback_planner,  # 可选：拒绝后的备选生成器
+    propose_alternative=my_fallback_planner,  # optional: rejected-action fallback
 )
 
 if result.suspended:
-    alert_human()          # m 次连续拒绝 → G0 挂起，等待复核
-    runtime.resume()       # 人工复核后从 G0 重新挣档位
+    alert_human()          # m consecutive rejections -> suspend at G0, await review
+    runtime.resume()       # after human review, gears must be re-earned
 ```
 
-### 档位语义
+### Gear semantics
 
-| 档位 | 名称 | 允许的动作 |
+| Gear | Name | Permitted actions |
 |---|---|---|
-| G0 | Observe | 只读观察、安全保持 |
-| G1 | Suggest | 生成无副作用的候选计划 |
-| G2 | Plan | 有界、可逆的恢复性动作 |
-| G3 | Execute | 独立选择有副作用的动作 |
-| G4 | Integrate | 系统级协调（多智能体下为全员 G3 的涌现属性） |
+| G0 | Observe | Read-only observation, safe holding |
+| G1 | Suggest | Side-effect-free candidate plans |
+| G2 | Plan | Bounded, reversible recovery actions |
+| G3 | Execute | Independently chosen side-effecting actions |
+| G4 | Integrate | System-level coordination (an emergent property of all-G3 fleets) |
 
-**慢升快降**：升档需要 σ < σ_low 且连续 h 个干净周期；σ 越界或出错立即降一档。自主度是挣出来的，且随时可撤回。
+**Slow up, fast down** (earned autonomy): escalation requires σ < σ_low **and**
+h consecutive clean cycles — every gear must be re-earned (v0.1.2+);
+de-escalation on σ overflow or error is immediate. Autonomy is earned, and it
+can always be revoked.
 
-## 框架适配
+A runnable version of this narrative lives in
+[`examples/lifecycle_demo.py`](examples/lifecycle_demo.py)
+(`python examples/lifecycle_demo.py`).
+
+## Framework adapters
 
 ```python
-# LangChain：pip install entropy-sdk[langchain]
+# LangChain: pip install entropy-sdk[langchain]
 from entropy_sdk.adapters.langchain import gated_tool
 safe_tool = gated_tool(runtime, my_tool, required_gear=Gear.EXECUTE)
 
-# PydanticAI：pip install entropy-sdk[pydanticai]
+# PydanticAI: pip install entropy-sdk[pydanticai]
 from entropy_sdk.adapters.pydanticai import gated
 
 @gated(runtime, required_gear=Gear.EXECUTE)
 def delete_records(table: str) -> str: ...
 ```
 
-门拒绝时**返回说明字符串而非抛异常**——拒绝本身是反馈信号，agent 下一轮可自行调整。
+On rejection the adapters **return an explanatory string instead of raising** —
+rejection itself is feedback the agent can act on next turn.
 
-（PydanticAI extra 说明：该适配器是**纯 stdlib 装饰器**，实际零框架依赖——
-`pip install entropy-sdk[pydanticai]` 的 extra 列表为空（FIX-8 名实对齐），直接
-`from entropy_sdk.adapters.pydanticai import gated` 即可用。）
+(PydanticAI extra note: that adapter is a **pure stdlib decorator** with zero
+framework dependencies — the `pydanticai` extra list is intentionally empty
+(FIX-8); just `from entropy_sdk.adapters.pydanticai import gated`.)
 
-（LangChain 边界句：`args_schema` 透传仅对带 schema 的真实 StructuredTool 生效；
-裸 tool 对象（只有 func、无 args_schema）仍受包装签名 `*args/**kwargs` 限制。）
+(LangChain boundary: `args_schema` passthrough only works for real
+StructuredTool instances carrying a schema; bare tool objects (func only, no
+args_schema) remain limited by the wrapper's `*args/**kwargs` signature.)
 
-## 威胁模型边界（论文护甲，部署前必读）
+## Threat model boundaries (paper armor — read before deploying)
 
-1. **门是唯一调度通道——仅在 SDK 控制的执行路径内成立**。使用者拿到 callable
-   后可以直接调用绕过（`tool.func(...)` 不过门）；SDK 管的是「经过 runtime.step
-   的调用」，管不了使用者自己手里的引用。
-2. **`required_gear` 是调用方声明契约（attestation）**。SDK 信任标签的真实性；
-   标签是否可信（谁有权给动作标档位）是部署方的责任——SDK 只对非法值 fail-closed，
-   不对「低标高档动作」负责。
-3. **门管调用不管事务**。`execute` 内已经发生的副作用不回滚——门的语义是
-   invocation 控制，不是 atomicity。需要事务性请在你的 execute 里自己实现补偿。
-4. **`resume()` 不清 σ**（设计语义，非缺陷）：人工复核 ≠ 信任瞬时恢复——
-   挂起解除后 σ 保留，档位要在干净周期里重新挣下来。
-5. **`except Exception` 不覆盖 `BaseException`**：proposer/execute 回调里抛
-   SystemExit/KeyboardInterrupt 时状态机仍会脱节——这是 Python 惯例取舍，
-   调用方不应在回调里抛 BaseException。
-7. **审计文件被删时读路径静默返回空**（fail-open）：文件模式下 `entries`/
-   metrics 对不存在的链文件返回空集而非报错，与写路径的 fail-closed 不对称——
-   部署方应监控审计文件的存在性（append-only 链文件消失本身就是事件）。
-6. **并发**：runtime 无锁。当前 CPython（GIL）下实测 8000/8000 周期无丢失更新；
-   free-threaded Python（3.13t+）下 cycle/σ 的读-改-写存在丢失更新风险——
-   多线程使用请外部串行化。
+1. **The gate is the sole dispatch channel — only inside execution paths the
+   SDK controls.** A caller holding the raw callable can bypass the gate
+   (`tool.func(...)` skips it); the SDK governs calls that go through
+   `runtime.step`, not references in the caller's hands.
+2. **`required_gear` is a caller-side attestation contract.** The SDK trusts
+   the label's truthfulness; whether labels may be trusted (who is allowed to
+   tag an action's gear) is the deployer's responsibility — the SDK
+   fail-closes on *invalid* values, but is not responsible for
+   under-tagged powerful actions.
+3. **The gate governs invocation, not transactions.** Side effects that
+   already happened inside `execute` are not rolled back — the semantics are
+   invocation control, not atomicity. Implement compensation in your own
+   `execute` if you need transactional behavior.
+4. **`resume()` does not clear σ** (design semantics, not a bug): human
+   review ≠ instant restoration of trust — σ persists after resuming, and
+   gears must be re-earned through clean cycles.
+5. **`except Exception` does not cover `BaseException`**: if a
+   proposer/execute callback raises SystemExit/KeyboardInterrupt, the state
+   machine can still desynchronize — this is standard Python practice;
+   callers must not raise BaseException inside callbacks.
+6. **Concurrency**: the runtime is lock-free. Under current CPython (GIL),
+   8000/8000 cycles measured with no lost updates; on free-threaded Python
+   (3.13t+), the read-modify-write of cycle/σ can lose updates — serialize
+   externally when using multiple threads.
+7. **A deleted audit file reads as empty** (fail-open read path): in file
+   mode, `entries`/metrics return empty results for a missing chain file
+   rather than raising — asymmetric with the fail-closed write path. Deployers
+   should monitor the audit file's existence (a missing append-only chain file
+   is itself an event).
 
-## 实证数据接口
+## Empirical data API
 
 ```python
-runtime.audit.gate_acceptance_rate()  # 门接受率（Theorem 1 假设 p1≥p3 的观测口径）
-runtime.audit.gear_histogram()        # gear 转移直方图（Theorem 3 最终镇定的证据）
+runtime.audit.gate_acceptance_rate()  # gate acceptance rate (Theorem 1, p1≥p3)
+runtime.audit.gear_histogram()        # gear transition histogram (Theorem 3)
 ```
 
-每一次运行都在为框架的经验验证生产数据——这是 SDK 相对完整系统的独特价值。
+Every run produces data for the framework's empirical validation — a unique
+value of the SDK relative to the full system.
 
-## 许可证
+## Changelog & security record
 
-MIT © Wang Miaosheng (ORCID: 0009-0003-2767-2421)
+- [CHANGELOG.md](CHANGELOG.md) — versioned changes, including behavior-change
+  and compatibility notes.
+- 中文文档：[README.zh-CN.md](README.zh-CN.md)
+
+## License
+
+MIT © Wang Miaosheng (ORCID: 0009-0003-2767-2421) — see [LICENSE](LICENSE).

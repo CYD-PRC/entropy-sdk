@@ -63,6 +63,16 @@ class UtilityGate:
                 reason=f"gate_error: utility raised {err} (treated as U=-inf)",
                 meta={"gate_error": err},
             )
+        # FIX4-1：非有限效用门内校验——同一把尺两个方向都闭上：
+        # NaN 靠 IEEE 碰巧 fail-closed，但 +inf >= θ 恒真会放行（fail-open）。
+        # 非有限一律拒绝，reason 载明值（审计落盘时经 FIX2-6 带符号消毒标记）。
+        if not math.isfinite(u):
+            return GateDecision(
+                admitted=False,
+                utility=u,
+                theta=self.theta,
+                reason=f"nonfinite utility: {u!r} (fail-closed)",
+            )
         admitted = u >= self.theta
         return GateDecision(
             admitted=admitted,
