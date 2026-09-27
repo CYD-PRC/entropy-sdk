@@ -69,10 +69,15 @@ class TestFIX3ConfigValidation:
             GearPolicy(sigma_step=-1)
 
     def test_fallback_rejects_bad(self):
+        # FIX2-3（v0.1.2）：max_alternatives=0 恢复合法（关闭 fallback），
+        # 非法面 = 负数 / 超上界 100 / 非整数
         with pytest.raises(ValueError):
-            FallbackConfig(max_alternatives=0)
+            FallbackConfig(max_alternatives=-1)
+        with pytest.raises(ValueError):
+            FallbackConfig(max_alternatives=101)
         with pytest.raises(ValueError):
             FallbackConfig(max_consecutive_rejections=0)
+        FallbackConfig(max_alternatives=0)  # 合法：关闭 fallback
 
 
 class TestFIX4InvalidGear:
@@ -146,7 +151,7 @@ class TestFIX5AuditChain:
                 if '"gate_decision"' in l][-1]
         json.loads(line)                           # 严格解析器合法
         e = json.loads(line)
-        assert e["utility"] is None and e["utility_nonfinite"] is True
+        assert e["utility"] is None and e["utility_nonfinite"] == "nan"  # FIX2-6：标记带符号
 
 
 class TestResumeKeepsSigma:
@@ -177,10 +182,9 @@ class TestTEST1RealSideEffects:
             return f"deleted {table}"
 
         rt = make_runtime(initial_gear=Gear.OBSERVE)
-        # 爬到 G2：patience=3 首升后 clean_streak 不清零（每周期一档）——
-        # G0→G1 在 c3，G1→G2 在 c4
+        # FIX2-4 后：每档都要挣满 h=3——G0→G1 在 c3，G1→G2 在 c6
         good = observe(lambda: 1)
-        for _ in range(4):
+        for _ in range(6):
             rt.step(state=None, action=good, execute=lambda a: a())
         assert rt.state.gear == Gear.PLAN
         # G2 试 G3 动作：零副作用（且这次拒绝会立即降到 G1——ϵ=1 语义）
@@ -189,8 +193,8 @@ class TestTEST1RealSideEffects:
                     execute=lambda a: a())
         assert not r.executed and world["deleted"] == []
         assert rt.state.gear == Gear.SUGGEST
-        # 重新挣到 G3：干净周期 c+1,c+2,c+3→G2，c+4→G3
-        for _ in range(4):
+        # 重新挣到 G3：G1→G2 三个周期 + G2→G3 三个周期（每档重新挣）
+        for _ in range(6):
             rt.step(state=None, action=good, execute=lambda a: a())
         assert rt.state.gear == Gear.EXECUTE
         r = rt.step(state=None, action=action(delete_records, "users",

@@ -88,6 +88,9 @@ def delete_records(table: str) -> str: ...
 `pip install entropy-sdk[pydanticai]` 的 extra 列表为空（FIX-8 名实对齐），直接
 `from entropy_sdk.adapters.pydanticai import gated` 即可用。）
 
+（LangChain 边界句：`args_schema` 透传仅对带 schema 的真实 StructuredTool 生效；
+裸 tool 对象（只有 func、无 args_schema）仍受包装签名 `*args/**kwargs` 限制。）
+
 ## 威胁模型边界（论文护甲，部署前必读）
 
 1. **门是唯一调度通道——仅在 SDK 控制的执行路径内成立**。使用者拿到 callable
@@ -100,7 +103,10 @@ def delete_records(table: str) -> str: ...
    invocation 控制，不是 atomicity。需要事务性请在你的 execute 里自己实现补偿。
 4. **`resume()` 不清 σ**（设计语义，非缺陷）：人工复核 ≠ 信任瞬时恢复——
    挂起解除后 σ 保留，档位要在干净周期里重新挣下来。
-5. **并发**：runtime 无锁。当前 CPython（GIL）下实测 8000/8000 周期无丢失更新；
+5. **`except Exception` 不覆盖 `BaseException`**：proposer/execute 回调里抛
+   SystemExit/KeyboardInterrupt 时状态机仍会脱节——这是 Python 惯例取舍，
+   调用方不应在回调里抛 BaseException。
+6. **并发**：runtime 无锁。当前 CPython（GIL）下实测 8000/8000 周期无丢失更新；
    free-threaded Python（3.13t+）下 cycle/σ 的读-改-写存在丢失更新风险——
    多线程使用请外部串行化。
 

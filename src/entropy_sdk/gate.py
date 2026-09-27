@@ -7,6 +7,8 @@ Utility Gate（论文 Definitions 2–3，Theorem 2）
 """
 from __future__ import annotations
 
+import math
+
 from dataclasses import dataclass, field
 from typing import Any, Callable, Protocol
 
@@ -41,8 +43,9 @@ class UtilityGate:
                 "UtilityGate requires an explicit utility function. "
                 "There is no fail-open mode: the gate is the sole dispatch channel."
             )
-        if theta < 0:
-            raise ValueError("theta must be >= 0 (paper Definition 3)")
+        # FIX2-2：theta 必须有限（拒 NaN/±inf）且非负
+        if not math.isfinite(theta) or theta < 0:
+            raise ValueError("theta must be finite and >= 0 (paper Definition 3)")
         self._utility = utility
         self.theta = float(theta)
 

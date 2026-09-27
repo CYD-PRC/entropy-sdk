@@ -12,6 +12,8 @@ G0 的只读动作平凡地满足 U ≥ 0 —— 系统永远有恢复路径，�
 """
 from __future__ import annotations
 
+import math
+
 from dataclasses import dataclass
 from typing import Any, Callable
 
@@ -22,9 +24,19 @@ class FallbackConfig:
     max_consecutive_rejections: int = 5  # m：连续拒绝上限，触发 G0 挂起
 
     def __post_init__(self):
-        # FIX-3b：非法配置构造即抛（fail-closed）
-        if self.max_alternatives < 1:
-            raise ValueError("max_alternatives must be >= 1")
+        # FIX-3b + FIX2-2 + FIX2-3：构造期校验（fail-closed）
+        # max_alternatives：0 合法（关闭 fallback 的显式语义，v0.1.2 恢复；
+        # v0.1 的 >=1 校验误杀了该意图——CHANGELOG 标注破坏性恢复）；上界 100
+        # 防 10**9 级每周期巨大循环。两参数均须有限整数。
+        for name in ("max_alternatives", "max_consecutive_rejections"):
+            v = getattr(self, name)
+            if isinstance(v, bool) or not (
+                isinstance(v, int)
+                or (isinstance(v, float) and math.isfinite(v) and v.is_integer())
+            ):
+                raise ValueError(f"{name} must be a finite integer, got {v!r}")
+        if not 0 <= self.max_alternatives <= 100:
+            raise ValueError("max_alternatives must be in [0, 100] (0 = fallback off)")
         if self.max_consecutive_rejections < 1:
             raise ValueError("max_consecutive_rejections must be >= 1")
 

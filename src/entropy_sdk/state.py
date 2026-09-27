@@ -41,7 +41,12 @@ class AuditLog:
     def __init__(self, path: str | Path | None = None):
         self.path = Path(path) if path else None
         self._buffer: list[dict] = []
-        self.corrupt_lines: int = 0  # FIX-5c：最近一次读盘跳过的坏行数
+        self.corrupt_lines: int = 0  # FIX-5c：最近一次读盘跳过的坏行数（内存模式恒 0）
+        # FIX2-5：文件模式读缓存——按 (mtime_ns, size) 失效。
+        # 选型理由：iter_entries() 生成器救不了 metrics 的重复读
+        #（acceptance_rate + histogram 各过一遍），缓存一次失效模型两者通吃。
+        self._cache_key: tuple | None = None
+        self._cache_entries: list[dict] = []
 
     def record(self, kind: str, **fields: Any) -> dict:
         # FIX-5d：非有限浮点（NaN/Inf）消毒为 null + 同名字段加 _nonfinite 标记，
@@ -50,7 +55,10 @@ class AuditLog:
         for k, v in fields.items():
             if isinstance(v, float) and not math.isfinite(v):
                 clean[k] = None
-                clean[f"{k}_nonfinite"] = True
+                # FIX2-6：消毒标记带符号（+inf / -inf / nan），保住信息区分度
+                clean[f"{k}_nonfinite"] = (
+                    "nan" if math.isnan(v) else ("+inf" if v > 0 else "-inf")
+                )
             else:
                 clean[k] = v
         entry = {"ts": time.time(), "kind": kind, **clean}
@@ -65,8 +73,31 @@ class AuditLog:
     @property
     def entries(self) -> list[dict]:
         # FIX-5b：文件模式与 metrics 同语义——读盘返回（README 主推路径不再恒空）
+        # FIX2-5：经缓存（mtime+size 失效），metrics 连读不重复扫盘
+        return self._read_all()
+
+    def _read_all(self) -> list[dict]:
         if self.path and self.path.exists():
-            return list(self._iter_all())
+            st = self.path.stat()
+            key = (st.st_mtime_ns, st.st_size)
+            if key != self._cache_key:
+                entries = []
+                corrupt = 0
+                with self.path.open(encoding="utf-8") as f:
+                    for line in f:
+                        line = line.strip()
+                        if not line:
+                            continue
+                        try:
+                            entries.append(json.loads(line))
+                        except json.JSONDecodeError:
+                            # FIX-5c：坏行跳过并计数，不崩
+                            corrupt += 1
+                self._cache_key = key
+                self._cache_entries = entries
+                self.corrupt_lines = corrupt
+            return list(self._cache_entries)
+        self.corrupt_lines = 0
         return list(self._buffer)
 
     def gear_histogram(self) -> dict[int, int]:
@@ -85,17 +116,4 @@ class AuditLog:
         return sum(1 for e in decisions if e["admitted"]) / len(decisions)
 
     def _iter_all(self):
-        if self.path and self.path.exists():
-            self.corrupt_lines = 0
-            with self.path.open(encoding="utf-8") as f:
-                for line in f:
-                    line = line.strip()
-                    if line:
-                        try:
-                            yield json.loads(line)
-                        except json.JSONDecodeError:
-                            # FIX-5c：坏行跳过并计数，不崩（append-only 链的
-                            # 半截写入/磁盘伤不应炸掉整个读面）
-                            self.corrupt_lines += 1
-        else:
-            yield from self._buffer
+        yield from self._read_all()

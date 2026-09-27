@@ -22,9 +22,18 @@ def _safe_gear(value: Any) -> Gear | None:
     required_gear 是调用方声明契约（attestation）——标签不可信时
     fail-closed：视同「不允许」，走档位前置闸拒绝路径，不抛栈穿透。
     """
+    if isinstance(value, Gear):
+        return value
+    if isinstance(value, bool):
+        # IntEnum 值查找里 True==1 会静默成 SUGGEST——显式拒绝（已实测验证的洞）
+        return None
+    if not isinstance(value, int):
+        # 拒绝 float/str/None/object（含 3.9、3.7、"3"、"EXECUTE"）
+        return None
     try:
-        return Gear(int(value))
-    except (TypeError, ValueError):
+        return Gear(value)
+    except (TypeError, ValueError, OverflowError):
+        # OverflowError：±inf 的 int() 转换（DEF-1 并案）
         return None
 
 
@@ -120,6 +129,11 @@ class EntropyRuntime:
                 **{"from": int(self.state.gear), "to": int(gear_after)},
                 sigma=round(self.state.sigma, 4),
             )
+            # FIX2-4：升档清零 clean_streak——每一档都要重新挣满 h 个连续干净周期
+            #（v0.1.1 及以前：首档挣 h 之后每周期一档直窜，与「慢升、逐档挣得」语义不符；
+            #  降档/挂起路径无需处理：拒绝分支已先把 clean_streak 清零）
+            if gear_after > self.state.gear:
+                self.state.clean_streak = 0
             self.state.gear = gear_after
 
         # m 次连续拒绝 → G0 挂起（Theorem 4 的终点）
@@ -207,7 +221,9 @@ class EntropyRuntime:
         execute: Callable[[Any], Any],
         propose_alternative: AlternativeProposer | None,
     ) -> CycleResult | None:
-        if propose_alternative is None:
+        if propose_alternative is None or self.fallback_cfg.max_alternatives == 0:
+            # FIX2-3：max_alternatives=0 是合法配置——关闭 fallback，
+            # proposer 零调用，直接进 σ/降档/挂起流程
             return None
         for i in range(self.fallback_cfg.max_alternatives):
             # FIX-1：proposer 异常视同无备选——记审计后走正常拒绝分支，
