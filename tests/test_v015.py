@@ -92,6 +92,8 @@ class TestFIX52AdapterGearContract:
 
     def test_valid_int_and_gear_accepted(self):
         # int(3.9) == 3 是真 int（构造期已截断完成），接受——语义同 runtime
+        # 具名 skip：无 langchain_core 的环境（如 packaging-smoke 的裸 wheel）不装 extra
+        pytest.importorskip("langchain_core")
         from entropy_sdk.adapters.langchain import gated_tool
         rt = EntropyRuntime(utility=lambda s, a: 1.0)
         tool = type("T", (), {"func": lambda: 1, "name": "noop",
