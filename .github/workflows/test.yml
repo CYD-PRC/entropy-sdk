@@ -36,7 +36,9 @@ jobs:
           pip install dist/*.whl
           python -c "import entropy_sdk; print(entropy_sdk.__version__)"
       - name: Test installed wheel
-        run: python -m pytest tests/ -q
+        run: |
+          pip install pytest
+          python -m pytest tests/ -q
       - name: twine check
         run: twine check dist/*
 
