@@ -36,7 +36,7 @@ class TestFIX81KeySideDegradation:
         rt = EntropyRuntime(utility=lambda s, a: 1.0)
         rt.audit.record("probe", detail={1: "a", "1": "b"})  # JSON 序列化后同键
         e = [x for x in rt.audit.entries if x["kind"] == "probe"][0]["detail"]
-        assert e["_key_collision"] is True
+        assert e["_audit_meta"]["key_collision"] is True  # FIX9-2：标记迁入保留命名空间
         # 保留先见者：int 键 1 的值 "a" 不被 "b" 静默覆盖
         assert e[1] == "a" or e["1"] == "a"
 
@@ -45,7 +45,7 @@ class TestFIX81KeySideDegradation:
         rt = EntropyRuntime(utility=lambda s, a: 1.0, audit_log=str(log))
         rt.audit.record("probe", detail={1: "a", "1": "b"})
         on_disk = [json.loads(l) for l in open(log, encoding="utf-8")]
-        assert on_disk[-1]["detail"]["_key_collision"] is True
+        assert on_disk[-1]["detail"]["_audit_meta"]["key_collision"] is True
 
 
 class TestFIX82BoolRejectedEverywhere:

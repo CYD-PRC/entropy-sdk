@@ -1,5 +1,24 @@
 # Changelog
 
+## v0.1.9（2026-09-28 · KIMICODE-SDKFIX9-20260928，**终局票：审计语义封口**）
+
+**FIX9-1**：非有限 float **键**消毒——`nan/±inf` 作 dict 键时降级为字符串标记
+（与 value 侧同记号）。`json.dumps` 对非有限键产出的是非严格 JSON，本票起键侧
+与值侧同一把尺（严格解析器可消费，断言端含 parse_constant 钩子）。
+
+**FIX9-2**：审计元数据迁入保留命名空间 `_audit_meta`——撞键标记
+`{"_audit_meta": {"key_collision": true}}`，不再占用用户字段名 `_key_collision`；
+用户自带 `_audit_meta` 字段时原值移入 `user_field_shadowed` 保留（零丢失）。
+**行为变更**：v0.1.8 引入的顶层 `_key_collision` 标记位置随之迁移（一日龄 API，
+随 FIX9-2 转正）。
+
+**FIX9-3**：CI pip-audit 证据三态化——`PASS`（运行且零漏洞）／`VULN`（硬失败）／
+`UNMEASURED`（查询未完成如 503，step 输出与 check 摘要显式可见，不得计入通过）。
+本轮本地实测：**PASS**（No known vulnerabilities found；v0.1.8 轮的 503 是瞬时态）。
+
+**终局注记**：本票后 SDK 审查循环正式关闭。冻结规则生效——仅「核心控制路径
+新 P1/P2」可开新票；hygiene 层一律攒批，不逐轮打。
+
 ## v0.1.8（2026-09-28 · KIMICODE-SDKFIX8-20260928，**收官票：契约一致性收尾**）
 
 **FIX8-1（P3）**：审计消毒器补键侧降级——dict 键与值同规则：非 JSON 键类型

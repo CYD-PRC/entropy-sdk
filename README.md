@@ -11,7 +11,7 @@ SDK distillation of the EntropyRuntime paper's core abstractions
 ![python](https://img.shields.io/badge/python-%3E%3D3.10-blue)
 
 > Test readings are reported from **raw CI logs, not badge conclusions**:
-> latest verified reading — **119 passed / 0 skipped** across Python 3.10–3.13
+> latest verified reading — **127 passed / 0 skipped** across Python 3.10–3.13
 > (Actions run inspected line-by-line). The packaging-smoke job's
 > **96 passed / 3 skipped** is the intended bare-wheel form (the 3 skips are the
 > named langchain-extra cases in a no-`langchain_core` environment) — the two

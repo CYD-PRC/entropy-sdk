@@ -71,7 +71,15 @@ def _sanitize_nonfinite(value: Any, _depth: int = 0, _seen: set | None = None) -
                 seen_keys = set()
                 collision = False
                 for k, v in value.items():
-                    nk = k if (isinstance(k, (str, int, float, bool)) or k is None) else str(k)
+                    # FIX9-1：float 键须有限——非有限 float 键降级为字符串标记
+                    #（"nan"/"+inf"/"-inf"，与 value 侧同记号）；json.dumps 对
+                    # NaN/Infinity 键产出的是非严格 JSON，违反「JSONL 可被严格解析」
+                    if isinstance(k, float) and not math.isfinite(k):
+                        nk = "nan" if math.isnan(k) else ("+inf" if k > 0 else "-inf")
+                    elif isinstance(k, (str, int, float, bool)) or k is None:
+                        nk = k
+                    else:
+                        nk = str(k)
                     sk = nk if isinstance(nk, str) else json.dumps(nk)
                     if sk in seen_keys:
                         collision = True
@@ -79,7 +87,15 @@ def _sanitize_nonfinite(value: Any, _depth: int = 0, _seen: set | None = None) -
                     seen_keys.add(sk)
                     out[nk] = _sanitize_nonfinite(v, _depth + 1, _seen)
                 if collision:
-                    out["_key_collision"] = True
+                    # FIX9-2：审计元数据收进保留命名空间 "_audit_meta"——
+                    # 用户数据若有 "_key_collision" 字段不再被审计标记覆盖；
+                    # 用户若自带 "_audit_meta" 字段，原值移入 user_field_shadowed
+                    # 保留（零丢失）。文档：_audit_meta 为保留命名空间。
+                    if "_audit_meta" in out:
+                        out["_audit_meta"] = {"user_field_shadowed": out["_audit_meta"],
+                                              "key_collision": True}
+                    else:
+                        out["_audit_meta"] = {"key_collision": True}
                 return out
             if isinstance(value, list):
                 return [_sanitize_nonfinite(v, _depth + 1, _seen) for v in value]
