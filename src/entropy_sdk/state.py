@@ -71,6 +71,7 @@ def _sanitize_nonfinite(value: Any, _depth: int = 0, _seen: set | None = None) -
                 seen_keys = set()
                 collision = False
                 for k, v in value.items():
+                    nk: Any
                     # FIX9-1：float 键须有限——非有限 float 键降级为字符串标记
                     #（"nan"/"+inf"/"-inf"，与 value 侧同记号）；json.dumps 对
                     # NaN/Infinity 键产出的是非严格 JSON，违反「JSONL 可被严格解析」
