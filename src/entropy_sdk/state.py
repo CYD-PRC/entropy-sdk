@@ -62,8 +62,25 @@ def _sanitize_nonfinite(value: Any, _depth: int = 0, _seen: set | None = None) -
         _seen.add(id(value))
         try:
             if isinstance(value, dict):
-                return {k: _sanitize_nonfinite(v, _depth + 1, _seen)
-                        for k, v in value.items()}
+                # FIX8-1：键侧与值侧同规则——非 JSON 键类型（str/int/float/bool/None
+                # 以外）降级为 str(k)；合法 JSON 键类型原样保留（json.dumps 对
+                # int/float/bool/None 键自有语义，不动）。撞键判据按 JSON 序列化后的
+                # 键形（1 与 "1"、True 与 "true" 同键）：保留先见者，不静默覆盖，
+                # 并在该 entry 加 "_key_collision": true 标记。
+                out = {}
+                seen_keys = set()
+                collision = False
+                for k, v in value.items():
+                    nk = k if (isinstance(k, (str, int, float, bool)) or k is None) else str(k)
+                    sk = nk if isinstance(nk, str) else json.dumps(nk)
+                    if sk in seen_keys:
+                        collision = True
+                        continue
+                    seen_keys.add(sk)
+                    out[nk] = _sanitize_nonfinite(v, _depth + 1, _seen)
+                if collision:
+                    out["_key_collision"] = True
+                return out
             if isinstance(value, list):
                 return [_sanitize_nonfinite(v, _depth + 1, _seen) for v in value]
             return tuple(_sanitize_nonfinite(v, _depth + 1, _seen) for v in value)

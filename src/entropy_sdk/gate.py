@@ -43,8 +43,9 @@ class UtilityGate:
                 "UtilityGate requires an explicit utility function. "
                 "There is no fail-open mode: the gate is the sole dispatch channel."
             )
-        # FIX2-2：theta 必须有限（拒 NaN/±inf）且非负
-        if not math.isfinite(theta) or theta < 0:
+        # FIX2-2 + FIX8-2：theta 必须有限且非负；bool 不是合法数值
+        #（isinstance(True, int) 蒙混面——与 _safe_gear 同一 bool 态度）
+        if isinstance(theta, bool) or not math.isfinite(theta) or theta < 0:
             raise ValueError("theta must be finite and >= 0 (paper Definition 3)")
         self._utility = utility
         self.theta = float(theta)

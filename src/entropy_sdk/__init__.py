@@ -17,7 +17,7 @@ from .policy import GearPolicy
 from .runtime import CycleResult, EntropyRuntime
 from .state import AuditLog, RuntimeState
 
-__version__ = "0.1.7"
+__version__ = "0.1.8"
 __all__ = [
     "Gear", "UtilityGate", "GateDecision", "GearPolicy", "FallbackConfig",
     "RuntimeState", "AuditLog", "EntropyRuntime", "CycleResult",

@@ -1,5 +1,20 @@
 # Changelog
 
+## v0.1.8（2026-09-28 · KIMICODE-SDKFIX8-20260928，**收官票：契约一致性收尾**）
+
+**FIX8-1（P3）**：审计消毒器补键侧降级——dict 键与值同规则：非 JSON 键类型
+（str/int/float/bool/None 以外）降级为 `str(k)`，合法键类型原样保留；撞键判据
+按 JSON 序列化后的键形（`1` 与 `"1"` 同键），保留先见者并加 `"_key_collision": true`
+标记（不静默覆盖）。
+
+**FIX8-2（P3）**：数值契约统一拒 bool——`UtilityGate.theta`、`GearPolicy` 全部
+数值字段（sigma_low/high/decay/step）对 bool 构造即抛；`FallbackConfig` 两字段
+与 `GearPolicy.patience` 自 v0.1.2 起本已拒 bool（回归保持）。同一 SDK 同一
+bool 态度（与 `_safe_gear` 对齐）；合法值（0/1/0.0/1.0）不受影响。
+
+**收官注记**：GPT 第八轮审查五票以来首次无新 P2，严重度曲线触底；本票清掉
+两条 P3 API hygiene 后 SDK 线冻结，进入攒批模式。
+
 ## v0.1.7（2026-09-28 · KIMICODE-SDKFIX7-20260928）
 
 **FIX7-1（P2）**：`entries()` 改深拷贝——浅拷贝在嵌套字段时代不再足够

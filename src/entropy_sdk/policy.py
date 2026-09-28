@@ -34,6 +34,8 @@ class GearPolicy:
         #   patience=1.5 会静默变 2；σ 族 NaN/±inf 同理拒收
         for name in ("sigma_low", "sigma_high", "sigma_decay", "sigma_step"):
             v = getattr(self, name)
+            if isinstance(v, bool):
+                raise ValueError(f"{name}: bool 不是合法数值（got {v!r}）")
             if not (isinstance(v, (int, float)) and math.isfinite(v)):
                 raise ValueError(f"{name} must be finite, got {v!r}")
         if isinstance(self.patience, bool) or not (
