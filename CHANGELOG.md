@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.1.6（2026-09-28 · KIMICODE-SDKFIX6-20260928）
+
+**FIX6-1（P2）**：`AuditLog.record()` 返回值改深拷贝——memory mode 下返回值与真账
+不再是同一个可变对象，调用方涂改返回值不再改写审计真账（v0.1.3 修的是 `entries`
+出栈隔离，本票把 `record()` 返回值这条闭上）。file mode 行为不变。
+
+**发布工程**：packaging smoke 增 wheel 内容显式断言（`entropy_sdk/py.typed` 与
+LICENSE 必须在 wheel 内，负控实测会红）；license 声明迁移 SPDX 形式
+（`license = "MIT"`，删 deprecated classifier，构建告警消失，twine check 仍 PASSED）。
+
+**发布**：GitHub Release v0.1.6（+ v0.1.5 补登）；PyPI v0.1.6。
+
 ## v0.1.5（2026-09-27 · KIMICODE-SDKFIX5-20260927，微修 + 发布工程）
 
 **FIX5-1 审计序列化递归消毒**：嵌套 dict/list/tuple 内的非有限 float（nan/±inf）

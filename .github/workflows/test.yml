@@ -41,6 +41,16 @@ jobs:
           python -m pytest tests/ -q
       - name: twine check
         run: twine check dist/*
+      - name: Wheel content assertions (FIX6-2)
+        run: |
+          python - <<'PY'
+          import glob, zipfile
+          whl = glob.glob("dist/*.whl")[0]
+          names = set(zipfile.ZipFile(whl).namelist())
+          assert "entropy_sdk/py.typed" in names, "py.typed missing from wheel"
+          assert any(n.endswith("LICENSE") or n == "LICENSE" for n in names), "LICENSE missing from wheel"
+          print("wheel content OK: py.typed + LICENSE present")
+          PY
 
   typecheck:
     runs-on: ubuntu-latest

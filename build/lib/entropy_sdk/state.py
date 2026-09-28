@@ -6,7 +6,6 @@
 """
 from __future__ import annotations
 
-import copy
 import json
 import math
 import time
@@ -104,11 +103,11 @@ class AuditLog:
                 f.write(json.dumps(entry, ensure_ascii=False, default=str) + "\n")
         else:
             self._buffer.append(entry)
-        # FIX6-1：返回深拷贝——返回值与真账完全隔离。
-        # 注意：顶层 dict(entry) 浅拷贝**不够**——嵌套容器仍是与真账共享的引用
-        #（消毒器只保证容器是新建的，不保证与返回值不共享）。entry 内容均为
-        # JSON 可序列化结构（含消毒后的字符串标记），deepcopy 安全。
-        return copy.deepcopy(entry)
+        # FIX6-1：返回隔离副本——返回值与真账不是同一个可变对象。
+        # 深隔离依据（依赖注明）：_sanitize_nonfinite 对**所有** dict/list/tuple
+        # 容器一律产出新结构（不止含非有限值的那些），故 entry 内无共享嵌套引用，
+        # 顶层浅拷贝即达成全隔离；若消毒器将来改为原地透传，此处必须改深拷贝。
+        return dict(entry)
 
     @property
     def entries(self) -> list[dict]:
