@@ -52,6 +52,8 @@ def _sanitize_nonfinite(value: Any, _depth: int = 0, _seen: set | None = None) -
         if math.isfinite(value):
             return value
         return "nan" if math.isnan(value) else ("+inf" if value > 0 else "-inf")
+    if value is None or isinstance(value, (bool, int, str)):
+        return value
     if isinstance(value, (dict, list, tuple)):
         if _seen is None:
             _seen = set()
@@ -67,7 +69,10 @@ def _sanitize_nonfinite(value: Any, _depth: int = 0, _seen: set | None = None) -
             return tuple(_sanitize_nonfinite(v, _depth + 1, _seen) for v in value)
         finally:
             _seen.discard(id(value))
-    return value
+    # FIX7-3：未知类型统一 str() 降级——与 file mode json.dumps(default=str)
+    # 同语义，保证 record() 的 deepcopy（FIX6-1）对任何对象不炸。
+    # 契约：audit fields 应为 JSON-compatible；未知对象按 str() 落账。
+    return str(value)
 
 
 class AuditLog:
@@ -114,9 +119,11 @@ class AuditLog:
     def entries(self) -> list[dict]:
         # FIX-5b：文件模式与 metrics 同语义——读盘返回（README 主推路径不再恒空）
         # FIX2-5：经缓存（mtime+size 失效），metrics 连读不重复扫盘
-        # FIX3-1：对外逐条浅拷贝——调用方涂改返回值不污染缓存与磁盘真值
-        #（条目值无嵌套结构，浅拷贝足够；内部 metrics 继续用缓存引用）
-        return [dict(e) for e in self._read_all()]
+        # FIX3-1 + FIX7-1：对外深拷贝——浅拷贝在嵌套字段时代不再足够
+        #（v0.1.3 的隔离声明按当时的标量世界成立；v0.1.5 引入嵌套容器字段后，
+        #  浅拷贝的嵌套引用与真账/缓存共享，涂改即污染——与 FIX6-1 的 record()
+        #  同法改 deepcopy。entry 内容均为 JSON 可序列化结构，安全）。
+        return [copy.deepcopy(e) for e in self._read_all()]
 
     def _read_all(self) -> list[dict]:
         if self.path and self.path.exists():

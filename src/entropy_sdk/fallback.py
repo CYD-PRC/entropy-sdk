@@ -24,6 +24,13 @@ class FallbackConfig:
     max_consecutive_rejections: int = 5  # m：连续拒绝上限，触发 G0 挂起
 
     def __post_init__(self):
+        # FIX7-2：整数值 float 归一化（构造契约 == 执行契约）——
+        # 3.0 通过整数性校验后字段归一为 int 3，runtime 的 range() 不再炸；
+        # 非整数值 float（1.5）仍在下方校验拒绝。
+        for name in ("max_alternatives", "max_consecutive_rejections"):
+            v = getattr(self, name)
+            if isinstance(v, float) and v.is_integer():
+                object.__setattr__(self, name, int(v))
         # FIX-3b + FIX2-2 + FIX2-3：构造期校验（fail-closed）
         # max_alternatives：0 合法（关闭 fallback 的显式语义，v0.1.2 恢复；
         # v0.1 的 >=1 校验误杀了该意图——CHANGELOG 标注破坏性恢复）；上界 100

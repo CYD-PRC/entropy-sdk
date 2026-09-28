@@ -1,5 +1,23 @@
 # Changelog
 
+## v0.1.7（2026-09-28 · KIMICODE-SDKFIX7-20260928）
+
+**FIX7-1（P2）**：`entries()` 改深拷贝——浅拷贝在嵌套字段时代不再足够
+（v0.1.5 引入嵌套容器后，返回值的嵌套引用与真账/缓存共享，涂改即污染）；
+与 FIX6-1 的 record() 同法。
+
+**FIX7-2（P2）**：整数值 float 归一化——`FallbackConfig(max_alternatives=3.0)` /
+`max_consecutive_rejections=5.0` 及 `GearPolicy.patience=2.0` 构造时归一为 int
+（构造契约 == 执行契约；3.0 时代 runtime 的 `range(3.0)` 会炸 TypeError）。
+非整数值 float 维持拒绝。
+
+**FIX7-3（P3）**：审计消毒器对未知类型对象统一 `str()` 降级（与 file mode
+`default=str` 同语义，保证 FIX6-1 的 deepcopy 对任何对象不炸）；契约写明：
+audit fields 应为 JSON-compatible，未知对象按 str() 落账。
+
+**FIX7-4（P3）**：README 测试计数与口径注记（106 passed 全量面 vs 96+3 裸 wheel
+面，两数各配一句，防误读）。
+
 ## v0.1.6（2026-09-28 · KIMICODE-SDKFIX6-20260928）
 
 **FIX6-1（P2）**：`AuditLog.record()` 返回值改深拷贝——memory mode 下返回值与真账

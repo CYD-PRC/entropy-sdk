@@ -122,6 +122,9 @@ runtime.audit.gear_histogram()        # gear 转移直方图（Theorem 3 最终�
 
 每一次运行都在为框架的经验验证生产数据——这是 SDK 相对完整系统的独特价值。
 
+契约：审计字段应为 JSON 兼容类型；未知对象类型按 `str()` 形态落账
+（memory / file 两种模式语义一致）。
+
 ## 许可证
 
 MIT © Wang Miaosheng (ORCID: 0009-0003-2767-2421)

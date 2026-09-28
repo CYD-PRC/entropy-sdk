@@ -25,6 +25,10 @@ class GearPolicy:
     sigma_step: float = 0.1   # Δσ：fallback 失败时 σ 的增量
 
     def __post_init__(self):
+        # FIX7-2 同族：patience 的整数值 float 归一化（2.0 → 2；int>=float 比较
+        # 虽不炸，但字段语义应为 int——与 FallbackConfig 同修，FIXREPORT 逐字段列表）
+        if isinstance(self.patience, float) and self.patience.is_integer():
+            object.__setattr__(self, "patience", int(self.patience))
         # FIX-3a + FIX2-2：非法参数构造即抛（fail-closed）
         # ——finite 校验：patience=NaN 会静默锁死 G0（clean_streak>=NaN 恒 False），
         #   patience=1.5 会静默变 2；σ 族 NaN/±inf 同理拒收

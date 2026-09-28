@@ -11,8 +11,12 @@ SDK distillation of the EntropyRuntime paper's core abstractions
 ![python](https://img.shields.io/badge/python-%3E%3D3.10-blue)
 
 > Test readings are reported from **raw CI logs, not badge conclusions**:
-> latest verified reading — **96 passed / 0 skipped** across Python 3.10–3.13
-> (Actions run inspected line-by-line). A green badge alone is not evidence.
+> latest verified reading — **106 passed / 0 skipped** across Python 3.10–3.13
+> (Actions run inspected line-by-line). The packaging-smoke job's
+> **96 passed / 3 skipped** is the intended bare-wheel form (the 3 skips are the
+> named langchain-extra cases in a no-`langchain_core` environment) — the two
+> numbers measure different install surfaces, they are not a discrepancy.
+> A green badge alone is not evidence.
 
 Unlike [CYD-PRC/entropyruntime](https://github.com/CYD-PRC/entropyruntime)
 (the full production system — FastAPI + PostgreSQL + Redis + OPA), this
@@ -162,6 +166,9 @@ runtime.audit.gear_histogram()        # gear transition histogram (Theorem 3)
 
 Every run produces data for the framework's empirical validation — a unique
 value of the SDK relative to the full system.
+
+Contract: audit fields should be JSON-compatible; unknown object types are
+recorded as their `str()` form (uniform across memory and file modes).
 
 ## Changelog & security record
 
